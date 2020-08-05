@@ -38,28 +38,24 @@ class PhotoOrganiser:
                 files_to_be_skipped.update([p for pl in self.existing_files.values() for p in pl])
 
         paths = sorted(list(self.dst_dir.rglob("*")))
-        path_index = 0
-        percent_done = 0
+        path_index = 1
         for path in paths:
 
-            _percent_done = int(path_index * 100 / len(paths))
-            if _percent_done != percent_done:
-                percent_done = _percent_done
-                print('Scaning dst: [%d%%]'%percent_done, end="\r", flush=True)
-
+            print('Scanning destination directory: [%d/%d]'%(path_index, len(paths)), end="\r", flush=True)
             path_index = path_index + 1
 
             if path.is_dir() \
-                or str(path) in files_to_be_skipped \
+                or path.name in files_to_be_skipped \
                 or path.suffix.lower() not in self.supportd_types \
                 or path.name.startswith('._'):
                 continue
 
             file_hash = fh.get_file_hash(path)
             if file_hash in self.existing_files:
-                self.existing_files[file_hash].append(str(path))
+                if path.name not in self.existing_files[file_hash]:
+                    self.existing_files[file_hash].append(path.name)
             else:
-                self.existing_files[file_hash] = [str(path)]
+                self.existing_files[file_hash] = [path.name]
 
         with open(json_file_path, 'w') as f:
             json.dump(self.existing_files, f)
@@ -71,15 +67,17 @@ class PhotoOrganiser:
         self.ignored_files = []
         self.existing_duplicate_files = {}
         self.new_duplicate_files = {}
+        self.new_files = {}
         self.unsupported_files = []
         self.unsupported_exts = set()
         self.error_files = []
 
         paths = sorted(list(self.src_dir.rglob('*')))
-        path_index = 0
+        path_index = 1
         for path in paths:
 
-            print('Scaning source [%d%%]\r'%i, end="")
+            print('Scanning source directory: [%d/%d]'%(path_index, len(paths)), end="\r", flush=True)
+            path_index = path_index + 1
 
             if path.is_dir():
                 self.processed_dirs.append(path)
@@ -102,7 +100,7 @@ class PhotoOrganiser:
                         while True:
                             if image_dst_path not in self.dst_to_src_dict:
                                 self.dst_to_src_dict[image_dst_path] = path
-                                self.new_files[src_file_hash] = path
+                                self.new_files[src_file_hash] = str(path)
                                 break
 
                             next_image_name = self.__get_next_image_name(image_dst_path.stem)
@@ -118,7 +116,18 @@ class PhotoOrganiser:
 
 
     def move(self):
-        for dst, src in self.dst_to_src_dict.items(): src.rename(dst)
+        for dst, src in self.dst_to_src_dict.items():
+            src.rename(dst)
+            file_hash = list(self.new_files.keys())[list(self.new_files.values()).index(str(src))]
+            if file_hash in self.existing_files:
+                if dst.name not in self.existing_files[file_hash]:
+                    self.existing_files[file_hash].append(dst.name)
+            else:
+                self.existing_files[file_hash] = [dst.name]
+
+        json_file_path = self.dst_dir / '.phorg.dstdata'
+        with open(json_file_path, 'w') as f:
+            json.dump(self.existing_files, f)
 
 
     def write_summary(self, file_path):
@@ -149,7 +158,7 @@ class PhotoOrganiser:
             of.write('\n'.join('    ../' + str(s.relative_to(self.src_dir)) + ' = ' + str([Path(p).name for p in c]) for s, c in sorted(self.existing_duplicate_files.items())))
 
             of.write(f'\n\nNew Duplicate file: [{len(self.new_duplicate_files)}]\n')
-            of.write('\n'.join('    ../' + str(s.relative_to(self.src_dir)) + ' = ' + str([Path(p).name for p in c]) for s, c in sorted(self.new_duplicate_files.items())))
+            of.write('\n'.join('    ../' + str(s.relative_to(self.src_dir)) + ' = ' + str(Path(c).relative_to(self.src_dir)) for s, c in sorted(self.new_duplicate_files.items())))
 
             of.write(f'\n\nIgnored file: [{len(self.ignored_files)}]\n')
             of.write('\n'.join('    ../' + str(p.relative_to(self.src_dir)) for p in sorted(self.ignored_files)))
@@ -201,3 +210,4 @@ class PhotoOrganiser:
         else:
             parts[2] = str(int(parts[2]) + 1)
         return '_'.join(parts)
+
