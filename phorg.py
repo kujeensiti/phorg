@@ -2,6 +2,7 @@
 import re
 import filehash as fh
 import json
+import shutil
 
 from pathlib import Path
 from PIL import Image
@@ -114,7 +115,8 @@ class PhotoOrganiser:
 
     def move(self):
         for dst, src in self.dst_to_src_dict.items():
-            src.rename(dst)
+            print('Moving : %s'%(src), end="\r", flush=True)
+            shutil.move(src, dst)
             file_hash = list(self.new_files.keys())[list(self.new_files.values()).index(str(src))]
             if file_hash in self.existing_files:
                 if dst.name not in self.existing_files[file_hash]:
