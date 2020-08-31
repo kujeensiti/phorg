@@ -23,26 +23,25 @@ class PhotoOrganiser:
         self.existing_files = {}
         self.new_files = {}
 
+        self.DST_DATA_FILE_PATH = self.dst_dir / '.phorg.dstdata'
+
 
     def scan_dst(self, force_rescan = False):
         self.existing_files = {}
 
-        json_file_path = self.dst_dir / '.phorg.dstdata'
-        files_to_be_skipped = set([str(json_file_path)])
+        files_to_be_skipped = set([self.DST_DATA_FILE_PATH.name])
 
         if not force_rescan:
-            if json_file_path.exists():
-                with open(json_file_path, 'r') as f:
+            if self.DST_DATA_FILE_PATH.exists():
+                with open(self.DST_DATA_FILE_PATH, 'r') as f:
                     self.existing_files = json.load(f)
 
                 files_to_be_skipped.update([p for pl in self.existing_files.values() for p in pl])
 
         paths = sorted(list(self.dst_dir.rglob("*")))
-        path_index = 1
-        for path in paths:
+        for path_index, path in enumerate(paths):
 
-            print('Scanning destination directory: [%d/%d]'%(path_index, len(paths)), end="\r", flush=True)
-            path_index = path_index + 1
+            print('Scanning destination directory: [%d/%d]'%(path_index+1, len(paths)), end="\r", flush=True)
 
             if path.is_dir() \
                 or path.name in files_to_be_skipped \
@@ -57,7 +56,7 @@ class PhotoOrganiser:
             else:
                 self.existing_files[file_hash] = [path.name]
 
-        with open(json_file_path, 'w') as f:
+        with open(self.DST_DATA_FILE_PATH, 'w') as f:
             json.dump(self.existing_files, f)
 
 
@@ -73,11 +72,9 @@ class PhotoOrganiser:
         self.error_files = []
 
         paths = sorted(list(self.src_dir.rglob('*')))
-        path_index = 1
-        for path in paths:
+        for path_index, path in enumerate(paths):
 
-            print('Scanning source directory: [%d/%d]'%(path_index, len(paths)), end="\r", flush=True)
-            path_index = path_index + 1
+            print('Scanning source directory: [%d/%d]'%(path_index+1, len(paths)), end="\r", flush=True)
 
             if path.is_dir():
                 self.processed_dirs.append(path)
@@ -125,8 +122,7 @@ class PhotoOrganiser:
             else:
                 self.existing_files[file_hash] = [dst.name]
 
-        json_file_path = self.dst_dir / '.phorg.dstdata'
-        with open(json_file_path, 'w') as f:
+        with open(self.DST_DATA_FILE_PATH, 'w') as f:
             json.dump(self.existing_files, f)
 
 
